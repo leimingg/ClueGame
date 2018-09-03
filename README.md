@@ -1,2 +1,2 @@
-# GlueGame
-Glue Game Repository for Software Engineering course
+# ClueGame
+clue Game Repository for Software Engineering course
