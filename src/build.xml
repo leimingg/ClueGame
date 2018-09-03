@@ -1,0 +1,149 @@
+<?xml version="1.0"?>
+<project name="clueless" default="main" basedir=".">
+    <!-- Sets variables which can later be used. -->
+    <!-- The value of a property is accessed via ${} -->
+    <property name="src.dir" location="src" />
+    <property name="src.tests" location="src/clueless/tests" />
+    <property name="build.dir" location="bin" />
+    <property name="dist.dir" location="dist" />
+    <property name="docs.dir" location="docs" />
+    <property name="lib.dir" location="lib" />
+
+    <path id="lib-classpath">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar" />
+        </fileset>
+    </path>
+
+
+    <!-- Deletes the existing build, docs and dist directory-->
+    <target name="clean">
+        <delete dir="${build.dir}" />
+        <delete dir="${docs.dir}" />
+        <delete dir="${dist.dir}" />
+    </target>
+
+    <!-- Creates the  build, docs and dist directory-->
+    <target name="makedir">
+        <mkdir dir="${build.dir}" />
+        <mkdir dir="${docs.dir}" />
+        <mkdir dir="${dist.dir}" />
+    </target>
+
+    <!-- Formats the java code -->
+    <target name="style" depends="makedir">
+        <fileset id="java-source-fileset" dir="${src.dir}" casesensitive="yes">
+            <include name="**/*.java" />
+        </fileset>
+        <pathconvert pathsep=" " refid="java-source-fileset" property="java-source-files" />
+        <exec executable="java">
+            <arg line="-jar ${lib.dir}/google-java-format-1.5-all-deps.jar" />
+            <arg value="--aosp" />
+            <arg value="--replace" />
+            <arg line="${java-source-files}" />
+        </exec>
+    </target>
+
+    <!-- Compiles the java code (including the usage of library for JUnit -->
+    <target name="compile" depends="style">
+
+        <javac debug="true" includeantruntime="false" srcdir="${src.dir}" destdir="${build.dir}">
+            <classpath refid="lib-classpath" />
+            <compilerarg value="-Xlint:unchecked" />
+        </javac>
+
+        <copy file="${src.dir}/clueless/client/gooey/GooeyScene.fxml" 
+              tofile="${build.dir}/clueless/client/gooey/GooeyScene.fxml" />
+
+        <copy todir="${build.dir}/clueless/client/gooey/sprites">
+            <fileset dir="${src.dir}/clueless/client/gooey/sprites" />
+        </copy>
+
+    </target>
+
+    <!-- Creates Javadoc -->
+    <target name="docs" depends="compile">
+        <javadoc packagenames="src" sourcepath="${src.dir}" destdir="${docs.dir}">
+            <classpath refid="lib-classpath" />
+            <!-- Define which files / directory should get included, we include all -->
+             <fileset dir="${src.dir}">
+                <include name="**/*.java" />
+                <exclude name="**/info" />
+             </fileset>
+        </javadoc>
+    </target>
+
+    <!--Creates the deployable jar file  -->
+    <target name="jar" depends="compile">
+        <jar manifest="manifest.mf" destfile="${dist.dir}\clueless.jar" basedir="${build.dir}">
+            <fileset dir="." includes="log4j2.xml" />
+            <!-- zipfileset dir="${src.dir}/clueless/client/gooey" 
+                        includes="GooeyScene.fxml" 
+                        fullpath="clueless/client/gooey/GooeyScene.fxml" / -->
+            <zipfileset src="${lib.dir}\ST4-4.0.8.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\ascii-utf-themes-0.0.1.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\asciitable-0.3.2.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\commons-lang3-3.4.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\jeromq-0.4.3.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\jline-3.6.1.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\log4j-api-2.10.0.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\log4j-core-2.10.0.jar" includes="**/*" excludes="**/META-INF" />
+            <zipfileset src="${lib.dir}\Skb-interfaces-0.0.1.jar" includes="**/*" excludes="**/META-INF" />
+        </jar>
+    </target>
+
+    <target name="main" depends="compile, jar, docs">
+        <description>Main target</description>
+    </target>
+
+    <target name="runserver" depends="jar">
+        <java classname="ServerRun">
+            <classpath>
+                <pathelement location="dist/clueless.jar" />
+            </classpath>
+            <arg value="--enable-logger" />
+            <sysproperty key="log4j.configurationFile" value="log4j2.xml" />
+            <sysproperty key="logFilename" value="server.log" />
+        </java>
+    </target>
+
+    <target name="runclient" depends="jar">
+        <java classname="ClientRun">
+            <classpath>
+                <pathelement location="dist/clueless.jar" />
+            </classpath>
+            <arg value="--enable-logger" />
+            <sysproperty key="log4j.configurationFile" value="log4j2.xml" />
+            <sysproperty key="logFilename" value="client.log" />
+        </java>
+    </target>
+
+    <!-- Builtin Ant Junit Task. Doesn't seem to work with Junit 4.12 atm. -->
+    <!-- target name="junittest" depends="jar">
+        <junit showoutput="yes" printsummary="yes" haltonfailure="yes">
+            <classpath>
+                <pathelement location="dist/clueless.jar" />
+                <path refid="lib-classpath" />
+            </classpath>
+            <batchtest fork="yes" todir=".">
+                <fileset dir="${src.tests}">
+                    <include name="**/*Test*.java" />
+                </fileset>
+            </batchtest>
+        </junit>
+    </target -->
+
+    <!-- Independent Java Task To Perform Junit Tests -->
+    <target name="test" depends="jar">
+        <java classname="clueless.tests.TstRunner">
+            <classpath>
+                <pathelement location="dist/clueless.jar" />
+                <path refid="lib-classpath" />
+            </classpath>
+            <sysproperty key="log4j.configurationFile" value="log4j2.xml" />
+            <sysproperty key="log4j.disable.jmx" value="true" />
+            <sysproperty key="logFilename" value="myjunit.log" />
+        </java>
+    </target>
+
+</project>
